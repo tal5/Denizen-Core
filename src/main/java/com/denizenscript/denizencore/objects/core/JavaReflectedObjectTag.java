@@ -2,17 +2,19 @@ package com.denizenscript.denizencore.objects.core;
 
 import com.denizenscript.denizencore.objects.Fetchable;
 import com.denizenscript.denizencore.objects.ObjectTag;
+import com.denizenscript.denizencore.scripts.commands.core.ReflectionSetCommand;
 import com.denizenscript.denizencore.tags.Attribute;
 import com.denizenscript.denizencore.tags.ObjectTagProcessor;
 import com.denizenscript.denizencore.tags.TagContext;
 import com.denizenscript.denizencore.utilities.*;
+import com.denizenscript.denizencore.utilities.debugging.Debug;
 import com.denizenscript.denizencore.utilities.debugging.DebugInternals;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Consumer;
 
 public class JavaReflectedObjectTag implements ObjectTag {
@@ -416,7 +418,92 @@ public class JavaReflectedObjectTag implements ObjectTag {
             }
             return new JavaReflectedObjectTag(val);
         });
+
+        // <--[tag]
+        // @attribute <JavaReflectedObjectTag.new[<object>|...]>
+        // @returns JavaReflectedObjectTag
+        // @description
+        // Returns a new instance of the reflected object, or null if no constructors matched.
+        // The reflected object must be of a class (see <@link tag util.reflect_class>).
+        // Each value in the provided list translates to one constructor parameter.
+        // -->
+        tagProcessor.registerTag(JavaReflectedObjectTag.class, ListTag.class, "new", (attribute, object, input) -> {
+            if (!(object.object instanceof Class<?> clazz)) {
+                attribute.echoError("Cannot construct from an instance: reflected object must be a class.");
+                return null;
+            }
+            Map<DenizenTypesKey, CachedConstructor> classConstructorCache = CONSTRUCTOR_CACHE.computeIfAbsent(clazz, k -> new HashMap<>());
+            int paramCount = input.size();
+            Object[] convertedParams = new Object[paramCount];
+            DenizenTypesKey denizenTypesKey = new DenizenTypesKey(input);
+            CachedConstructor cachedConstructor = classConstructorCache.computeIfAbsent(denizenTypesKey, k -> {
+                for (Constructor<?> constructor : clazz.getDeclaredConstructors()) {
+                    if (constructor.isAnnotationPresent(ReflectionRefuse.class)) {
+                        continue;
+                    }
+                    if (constructor.getParameterCount() != paramCount) {
+                        continue;
+                    }
+                    Class<?>[] parameterTypes = constructor.getParameterTypes();
+                    if (!tryConvertParms(parameterTypes, input, convertedParams, false)) {
+                        continue;
+                    }
+                    // All params matched
+                    try {
+                        constructor.setAccessible(true);
+                        return new CachedConstructor(parameterTypes, ReflectionHelper.LOOKUP.unreflectConstructor(constructor));
+                    }
+                    catch (IllegalAccessException e) {
+                        attribute.echoError("Couldn't access constructor:");
+                        attribute.echoError(e);
+                        return null;
+                    }
+                }
+                return null;
+            });
+            if (cachedConstructor == null) {
+                classConstructorCache.put(denizenTypesKey, null); // Explicitly mark as missing, to avoid future lookups
+                attribute.echoError("No constructor matching supplied parameters found.");
+                return null;
+            }
+            tryConvertParms(cachedConstructor.parameterTypes(), input, convertedParams, true);
+            try {
+                Object constructed = cachedConstructor.constructor().invokeWithArguments(convertedParams);
+                return new JavaReflectedObjectTag(constructed);
+            }
+            catch (Throwable e) {
+                attribute.echoError("Failed to construct new object:");
+                attribute.echoError(e);
+                return null;
+            }
+        });
     }
+
+    static boolean tryConvertParms(Class<?>[] parameterTypes, ListTag denizenParams, Object[] javaParams, boolean showErrors) {
+        for (int i = 0; i < parameterTypes.length; i++) {
+            Class<?> parameterType = parameterTypes[i];
+            ObjectTag denizenParam = denizenParams.getObject(i);
+            Object convertedParam = ReflectionSetCommand.convertObjectTypeFor(parameterType, denizenParam, showErrors);
+            if (convertedParam == null) {
+                return false;
+            }
+            javaParams[i] = convertedParam;
+        }
+        return true;
+    }
+
+    record DenizenTypesKey(List<Class<?>> denizenTypes) {
+        public DenizenTypesKey(ListTag list) {
+            this(new ArrayList<>(list.size()));
+            for (ObjectTag object : list.objectForms) {
+                denizenTypes.add(object.getDenizenObjectType().clazz);
+            }
+        }
+    }
+
+    record CachedConstructor(Class<?>[] parameterTypes, MethodHandle constructor) {}
+
+    static final Map<Class<?>, Map<DenizenTypesKey, CachedConstructor>> CONSTRUCTOR_CACHE = new HashMap<>();
 
     public Field getFieldForTag(Consumer<String> error, String fieldName) {
         Field field = null;

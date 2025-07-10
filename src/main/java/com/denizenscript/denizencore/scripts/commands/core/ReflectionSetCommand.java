@@ -80,11 +80,15 @@ public class ReflectionSetCommand extends AbstractCommand {
     }
 
     public static Object convertObjectTypeFor(Class<?> type, ObjectTag value) {
+        return convertObjectTypeFor(type, value, true);
+    }
+
+    public static Object convertObjectTypeFor(Class<?> type, ObjectTag value, boolean showErrors) {
         if (value == null) {
             return null;
         }
-        if (value instanceof JavaReflectedObjectTag) {
-            return ((JavaReflectedObjectTag) value).object;
+        if (value instanceof JavaReflectedObjectTag javaReflectedObjectTag) {
+            return javaReflectedObjectTag.object;
         }
         Object javaForm = value.getJavaObject();
         if (javaForm != null && type.isAssignableFrom(javaForm.getClass())) {
@@ -99,12 +103,14 @@ public class ReflectionSetCommand extends AbstractCommand {
         }
         if (type.isEnum()) {
             Object enumVal = value.asElement().asEnum((Class<? extends Enum>) type);
-            if (enumVal == null) {
+            if (enumVal == null && showErrors) {
                 Debug.echoError("Cannot convert value '" + value + "' to type '" + type.getName() + "' - value is not recognized as an enum constant.");
             }
             return enumVal;
         }
-        Debug.echoError("Cannot convert value '" + value + "' to type '" + type.getName() + "' - no known conversion registered.");
+        if (showErrors) {
+            Debug.echoError("Cannot convert value '" + value + "' to type '" + type.getName() + "' - no known conversion registered.");
+        }
         return null;
     }
 

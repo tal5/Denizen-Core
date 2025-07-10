@@ -339,7 +339,7 @@ public class ReflectionHelper {
     private static final long OVERRIDE_OFFSET = 12; // Field offset of 'override' AKA 'setAccessible'. May change arbitrarily from JDK updates. Required for reflection, so we can't use reflection to read it.
     private static Method ADD_OPENS;
     private static Method GET_MODULE;
-    private static MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
+    public static MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
     private static Field MODIFIERS_FIELD;
     private static Unsafe UNSAFE;
     private static boolean haveLoadedUnsafeMethods = false;
