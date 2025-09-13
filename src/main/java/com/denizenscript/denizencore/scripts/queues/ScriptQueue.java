@@ -6,6 +6,7 @@ import com.denizenscript.denizencore.objects.ObjectTag;
 import com.denizenscript.denizencore.objects.core.*;
 import com.denizenscript.denizencore.scripts.ScriptEntry;
 import com.denizenscript.denizencore.scripts.queues.core.TimedQueue;
+import com.denizenscript.denizencore.tags.TagContext;
 import com.denizenscript.denizencore.utilities.*;
 import com.denizenscript.denizencore.utilities.debugging.Debug;
 import com.denizenscript.denizencore.utilities.debugging.Debuggable;
@@ -134,7 +135,7 @@ public abstract class ScriptQueue implements Debuggable, DefinitionProvider {
     }
 
     @Override
-    public ObjectTag getDefinitionObject(String definition) {
+    public ObjectTag getDefinitionObjectWithWarn(String definition, TagContext context) {
         if (definition == null) {
             return null;
         }
@@ -144,7 +145,7 @@ public abstract class ScriptQueue implements Debuggable, DefinitionProvider {
                 return value;
             }
         }
-        return definitions.getDeepObject(definition);
+        return definitions.getDeepObjectWithWarn(definition, context);
     }
 
     @Override
@@ -155,19 +156,6 @@ public abstract class ScriptQueue implements Debuggable, DefinitionProvider {
             }
         }
         definitions.putDeepObject(definition, value);
-    }
-
-    @Override
-    public String getDefinition(String definition) {
-        if (definition == null) {
-            return null;
-        }
-        return CoreUtilities.stringifyNullPass(getDefinitionObject(definition));
-    }
-
-    @Override
-    public boolean hasDefinition(String definition) {
-        return getDefinitionObject(definition) != null;
     }
 
     @Override

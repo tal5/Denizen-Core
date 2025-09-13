@@ -13,6 +13,7 @@ import com.denizenscript.denizencore.utilities.CoreUtilities;
 import com.denizenscript.denizencore.utilities.NaturalOrderComparator;
 import com.denizenscript.denizencore.utilities.YamlConfiguration;
 import com.denizenscript.denizencore.utilities.debugging.Debug;
+import com.denizenscript.denizencore.utilities.debugging.Warning;
 import com.denizenscript.denizencore.utilities.text.StringHolder;
 import org.json.JSONObject;
 
@@ -51,6 +52,8 @@ public class MapTag implements ObjectTag {
     //
     // -->
 
+    public static final String DEPRECATED_KEYS_PREFIX = "denizen:__deprecated[";
+
     public static String unescapeLegacyEntry(String value) {
         if (value.indexOf('&') == -1) {
             return value;
@@ -74,7 +77,7 @@ public class MapTag implements ObjectTag {
             string = string.substring("map@".length());
         }
         MapTag result = new MapTag();
-        if (string.length() == 0) {
+        if (string.isEmpty()) {
             return result;
         }
         if (string.endsWith("|")) {
@@ -97,6 +100,44 @@ public class MapTag implements ObjectTag {
         if (!hasBrackets && string.contains("=")) {
             string = "[" + string + "]";
             hasBrackets = true;
+        }
+        int deprecatedIndex = string.indexOf(DEPRECATED_KEYS_PREFIX);
+        Map<StringHolder, Warning> deprecatedKeys = null;
+        if (deprecatedIndex != -1) {
+            String rawInput = string;
+            string = rawInput.substring(0, deprecatedIndex);
+            Debug.log("Deprecations removed: " + string);
+            String deprecationsData = rawInput.substring(deprecatedIndex + DEPRECATED_KEYS_PREFIX.length() - 1);
+            Debug.log("Deprecations text: " + deprecationsData);
+            List<String> deprecations = ObjectFetcher.separateProperties(deprecationsData);
+            Debug.log("Split deprecations: " + deprecations);
+            for (int i = 1; i < deprecations.size(); i++) {
+                String pair = deprecations.get(i);
+                int separator = pair.indexOf('=');
+                if (separator == -1 || separator == 0 || separator == pair.length() -1) {
+                    if (context == null || context.showErrors()) {
+                        Debug.echoError("Invalid deprecation key=warning pair string '" + pair + "' for map input '" + deprecationsData + "'! These values should NOT be manually provided!");
+                    }
+                    deprecatedKeys = null;
+                    break;
+                }
+                String value = pair.substring(separator + 1);
+                Warning warning = Warning.ALL_WARNINGS.get(value);
+                if (warning == null) {
+                    Debug.log("Warning not found: " + value);
+                    // Silently ignore, warnings can be removed
+                    continue;
+                }
+                String key = pair.substring(0, separator);
+                if (deprecatedKeys == null) {
+                    deprecatedKeys = new HashMap<>();
+                }
+                Debug.log("Key " + key + " deprecated with " + value);
+                deprecatedKeys.put(new StringHolder(key), warning);
+            }
+            if (deprecatedKeys != null) {
+                result.deprecatedKeys = deprecatedKeys;
+            }
         }
         if (hasBrackets) {
             if (string.equals("[]")) {
@@ -133,6 +174,7 @@ public class MapTag implements ObjectTag {
     }
 
     public LinkedHashMap<StringHolder, ObjectTag> map;
+    public Map<StringHolder, Warning> deprecatedKeys;
 
     public MapTag() {
         this.map = new LinkedHashMap<>();
@@ -148,6 +190,7 @@ public class MapTag implements ObjectTag {
         for (Map.Entry<StringHolder, ObjectTag> entry : entrySet()) {
             newMap.putObject(entry.getKey(), entry.getValue().duplicate());
         }
+        newMap.deprecatedKeys = this.deprecatedKeys;
         return newMap;
     }
 
@@ -206,6 +249,17 @@ public class MapTag implements ObjectTag {
         }
         debugText.setLength(debugText.length() - "<LG>;<Y> ".length());
         debugText.append("<LG>]");
+        if (deprecatedKeys != null) {
+            debugText.append(" <LR>(Deprecated: <Y>");
+            Iterator<StringHolder> deprecatedKeysIterator = deprecatedKeys.keySet().iterator();
+            while (deprecatedKeysIterator.hasNext()) {
+                debugText.append(deprecatedKeysIterator.next());
+                if (deprecatedKeysIterator.hasNext()) {
+                    debugText.append("<LG>, <Y>");
+                }
+            }
+            debugText.append("<LR>)");
+        }
         return debugText.toString();
     }
 
@@ -217,10 +271,18 @@ public class MapTag implements ObjectTag {
         StringBuilder output = new StringBuilder();
         output.append("map@[");
         for (Map.Entry<StringHolder, ObjectTag> entry : entrySet()) {
-            output.append(PropertyParser.escapePropertyKey(entry.getKey().str)).append("=").append(PropertyParser.escapePropertyValue(entry.getValue().savable())).append(";");
+            output.append(PropertyParser.escapePropertyKey(entry.getKey().str)).append('=').append(PropertyParser.escapePropertyValue(entry.getValue().savable())).append(';');
         }
         output.setLength(output.length() - 1);
         output.append(']');
+        if (deprecatedKeys != null) {
+            output.append(DEPRECATED_KEYS_PREFIX);
+            for (Map.Entry<StringHolder, Warning> entry : deprecatedKeys.entrySet()) {
+                output.append(PropertyParser.escapePropertyKey(entry.getKey().str)).append('=').append(entry.getValue().id).append(';');
+            }
+            output.setLength(output.length() - 1);
+            output.append(']');
+        }
         return output.toString();
     }
 
@@ -244,19 +306,23 @@ public class MapTag implements ObjectTag {
     }
 
     public ObjectTag getDeepObject(String key) {
+        return getDeepObjectWithWarn(key, null);
+    }
+
+    public ObjectTag getDeepObjectWithWarn(String key, TagContext context) {
         if (!CoreUtilities.contains(key, '.')) {
             return getObject(key);
         }
         MapTag current = this;
         List<String> subkeys = CoreUtilities.split(key, '.');
         for (int i = 0; i < subkeys.size() - 1; i++) {
-            ObjectTag subValue = current.getObject(subkeys.get(i));
+            ObjectTag subValue = context == null ? current.getObject(subkeys.get(i)) : current.getObjectWithWarn(subkeys.get(i), context);
             if (!(subValue instanceof MapTag)) {
                 return null;
             }
             current = (MapTag) subValue;
         }
-        return current.getObject(subkeys.get(subkeys.size() - 1));
+        return context == null ? current.getObject(subkeys.get(subkeys.size() - 1)) : current.getObjectWithWarn(subkeys.get(subkeys.size() - 1), context);
     }
 
     public ObjectTag getObject(String key, Supplier<ObjectTag> defaultGetter) {
@@ -303,6 +369,21 @@ public class MapTag implements ObjectTag {
         return map.get(new StringHolder(key));
     }
 
+    public ObjectTag getObjectWithWarn(String key, TagContext context) {
+        return getObjectWithWarn(new StringHolder(key), context);
+    }
+
+    public ObjectTag getObjectWithWarn(StringHolder key, TagContext context) {
+        ObjectTag object = getObject(key);
+        if (object != null && deprecatedKeys != null) {
+            Warning warning = deprecatedKeys.get(key);
+            if (warning != null) {
+                warning.warn(context);
+            }
+        }
+        return object;
+    }
+
     public ObjectTag getObject(StringHolder key) {
         return map.get(key);
     }
@@ -345,6 +426,15 @@ public class MapTag implements ObjectTag {
         }
     }
 
+    public void putDeprecatedObject(String key, ObjectTag value, Warning warning) {
+        StringHolder keyHolder = new StringHolder(key);
+        putObject(keyHolder, value);
+        if (deprecatedKeys == null) {
+            deprecatedKeys = new HashMap<>();
+        }
+        deprecatedKeys.put(keyHolder, warning);
+    }
+
     public void putObject(StringHolder key, ObjectTag value) {
         if (value == null) {
             remove(key);
@@ -355,11 +445,17 @@ public class MapTag implements ObjectTag {
     }
 
     public void remove(String key) {
-        map.remove(new StringHolder(key));
+        remove(new StringHolder(key));
     }
 
     public void remove(StringHolder key) {
         map.remove(key);
+        if (deprecatedKeys != null) {
+            deprecatedKeys.remove(key);
+            if (deprecatedKeys.isEmpty()) {
+                deprecatedKeys = null;
+            }
+        }
     }
 
     public ListTag keys() {
@@ -566,14 +662,14 @@ public class MapTag implements ObjectTag {
                 ListTag keyList = attribute.getParamObject().asType(ListTag.class, attribute.context);
                 boolean contains = true;
                 for (String key : keyList) {
-                    if (object.getObject(key) == null) {
+                    if (object.getObjectWithWarn(key, attribute.context) == null) {
                         contains = false;
                         break;
                     }
                 }
                 return new ElementTag(contains);
             }
-            return new ElementTag(object.getObject(attribute.getParam()) != null);
+            return new ElementTag(object.getObjectWithWarn(attribute.getParam(), attribute.context) != null);
         });
 
         // <--[tag]
@@ -596,9 +692,9 @@ public class MapTag implements ObjectTag {
                 return null;
             }
             if (attribute.getParam().contains("|")) {
-                return new ListTag(attribute.paramAsType(ListTag.class), object::getObject);
+                return new ListTag(attribute.paramAsType(ListTag.class), key -> object.getObjectWithWarn(key, attribute.context));
             }
-            return object.getObject(attribute.getParam());
+            return object.getObjectWithWarn(attribute.getParam(), attribute.context);
         });
 
         // <--[tag]
@@ -625,9 +721,9 @@ public class MapTag implements ObjectTag {
                 return null;
             }
             if (attribute.getParam().contains("|")) {
-                return new ListTag(attribute.paramAsType(ListTag.class), object::getDeepObject);
+                return new ListTag(attribute.paramAsType(ListTag.class), key -> object.getDeepObjectWithWarn(key, attribute.context));
             }
-            return object.getDeepObject(attribute.getParam());
+            return object.getDeepObjectWithWarn(attribute.getParam(), attribute.context);
         };
         tagProcessor.registerStaticTag(ObjectTag.class, "deep_get", deepGetRunnable);
         tagProcessor.registerStaticTag(ObjectTag.class, "", deepGetRunnable);
@@ -646,7 +742,7 @@ public class MapTag implements ObjectTag {
             MapTag output = new MapTag();
             for (String key : keys) {
                 StringHolder keyHolder = new StringHolder(key);
-                ObjectTag value = object.getObject(keyHolder);
+                ObjectTag value = object.getObjectWithWarn(keyHolder, attribute.context);
                 if (value != null) {
                     output.putObject(keyHolder, value);
                 }

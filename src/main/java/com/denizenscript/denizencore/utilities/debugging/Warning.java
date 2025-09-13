@@ -6,7 +6,12 @@ import com.denizenscript.denizencore.scripts.queues.ScriptQueue;
 import com.denizenscript.denizencore.tags.TagContext;
 import com.denizenscript.denizencore.utilities.Deprecations;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class Warning { // Note: can be called async
+
+    public static final Map<String, Warning> ALL_WARNINGS = new HashMap<>();
 
     public String id;
 
@@ -15,6 +20,7 @@ public class Warning { // Note: can be called async
     public Warning(String id, String message) {
         this.id = id;
         this.message = message;
+        ALL_WARNINGS.put(id, this);
     }
 
     public boolean testShouldWarn() {

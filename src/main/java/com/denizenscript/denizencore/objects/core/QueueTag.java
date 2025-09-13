@@ -3,7 +3,10 @@ package com.denizenscript.denizencore.objects.core;
 import com.denizenscript.denizencore.flags.AbstractFlagTracker;
 import com.denizenscript.denizencore.flags.FlaggableObject;
 import com.denizenscript.denizencore.flags.MapTagBasedFlagTracker;
-import com.denizenscript.denizencore.objects.*;
+import com.denizenscript.denizencore.objects.Adjustable;
+import com.denizenscript.denizencore.objects.Fetchable;
+import com.denizenscript.denizencore.objects.Mechanism;
+import com.denizenscript.denizencore.objects.ObjectTag;
 import com.denizenscript.denizencore.scripts.ScriptEntry;
 import com.denizenscript.denizencore.scripts.queues.ScriptQueue;
 import com.denizenscript.denizencore.scripts.queues.core.TimedQueue;
@@ -311,7 +314,7 @@ public class QueueTag implements ObjectTag, Adjustable, FlaggableObject {
         // Returns null if the queue lacks the definition.
         // -->
         tagProcessor.registerTag(ObjectTag.class, ElementTag.class, "definition", (attribute, object, defName) -> {
-            return object.getQueue().getDefinitionObject(defName.asString());
+            return object.getQueue().getDefinitionObjectWithWarn(defName.asString(), attribute.context);
         });
 
         // <--[tag]

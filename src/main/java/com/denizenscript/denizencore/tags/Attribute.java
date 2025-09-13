@@ -10,7 +10,9 @@ import com.denizenscript.denizencore.utilities.CoreUtilities;
 import com.denizenscript.denizencore.utilities.DefinitionProvider;
 import com.denizenscript.denizencore.utilities.debugging.Debug;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
 public class Attribute {
 
@@ -317,51 +319,33 @@ public class Attribute {
     public static class OverridingDefinitionProvider implements DefinitionProvider {
         public DefinitionProvider originalProvider;
         public MapTag altDefs = new MapTag();
+
         public OverridingDefinitionProvider(DefinitionProvider original) {
             originalProvider = original;
         }
+
         @Override
         public void addDefinition(String definition, String value) {
             originalProvider.addDefinition(definition, value);
         }
+
         @Override
         public void addDefinition(String definition, ObjectTag value) {
             originalProvider.addDefinition(definition, value);
         }
+
         @Override
         public MapTag getAllDefinitions() {
             return originalProvider.getAllDefinitions();
         }
+
         @Override
-        public ObjectTag getDefinitionObject(String definition) {
-            ObjectTag result = altDefs.getDeepObject(CoreUtilities.toLowerCase(definition));
+        public ObjectTag getDefinitionObjectWithWarn(String definition, TagContext context) {
+            ObjectTag result = altDefs.getDeepObjectWithWarn(CoreUtilities.toLowerCase(definition), context);
             if (result != null) {
                 return result;
             }
-            return originalProvider.getDefinitionObject(definition);
-        }
-
-        @Override
-        public String getDefinition(String definition) {
-            ObjectTag result = altDefs.getDeepObject(CoreUtilities.toLowerCase(definition));
-            if (result != null) {
-                return result.toString();
-            }
-            return originalProvider.getDefinition(definition);
-        }
-
-        @Override
-        public boolean hasDefinition(String definition) {
-            ObjectTag result = altDefs.getDeepObject(CoreUtilities.toLowerCase(definition));
-            if (result != null) {
-                return true;
-            }
-            return originalProvider.hasDefinition(definition);
-        }
-
-        @Override
-        public void removeDefinition(String definition) {
-            originalProvider.removeDefinition(definition);
+            return originalProvider.getDefinitionObjectWithWarn(definition, context);
         }
     }
 

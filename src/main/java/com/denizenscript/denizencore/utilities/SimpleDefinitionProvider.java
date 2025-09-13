@@ -1,8 +1,9 @@
 package com.denizenscript.denizencore.utilities;
 
-import com.denizenscript.denizencore.objects.core.ElementTag;
 import com.denizenscript.denizencore.objects.ObjectTag;
+import com.denizenscript.denizencore.objects.core.ElementTag;
 import com.denizenscript.denizencore.objects.core.MapTag;
+import com.denizenscript.denizencore.tags.TagContext;
 
 public class SimpleDefinitionProvider implements DefinitionProvider {
 
@@ -24,28 +25,10 @@ public class SimpleDefinitionProvider implements DefinitionProvider {
     }
 
     @Override
-    public ObjectTag getDefinitionObject(String definition) {
+    public ObjectTag getDefinitionObjectWithWarn(String definition, TagContext context) {
         if (definition == null) {
             return null;
         }
-        return definitions.getDeepObject(definition);
-    }
-
-    @Override
-    public String getDefinition(String definition) {
-        if (definition == null) {
-            return null;
-        }
-        return CoreUtilities.stringifyNullPass(getDefinitionObject(definition));
-    }
-
-    @Override
-    public boolean hasDefinition(String definition) {
-        return getDefinitionObject(definition) != null;
-    }
-
-    @Override
-    public void removeDefinition(String definition) {
-        addDefinition(definition, (ObjectTag) null);
+        return definitions.getDeepObjectWithWarn(definition, context);
     }
 }

@@ -142,7 +142,7 @@ public class AdjustCommand extends AbstractCommand {
             }
             if (lowerObjectString.startsWith("def:")) {
                 String defName = lowerObjectString.substring("def:".length());
-                ObjectTag def = entry.getResidingQueue().getDefinitionObject(defName);
+                ObjectTag def = entry.getResidingQueue().getDefinitionObjectWithWarn(defName, entry.getContext());
                 if (def == null) {
                     Debug.echoError("Invalid definition name '" + defName + "', cannot adjust");
                     return object;
