@@ -120,6 +120,7 @@ public class CommandRegistry {
         if (shouldRegisterByClass("Redis command", "redis.clients.jedis.Jedis")) {
             registerCommand(RedisCommand.class);
         }
+        registerCommand(ReflectionCallCommand.class);
         registerCommand(ReflectionSetCommand.class);
         registerCommand(ReloadCommand.class);
         registerCommand(SQLCommand.class);

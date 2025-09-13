@@ -215,6 +215,29 @@ public class ReflectionHelper {
         }
     }
 
+    public static Class<?> getClassOrPrimitive(String className) {
+        return switch (className) {
+            case "void" -> void.class;
+            case "boolean" -> boolean.class;
+            case "byte" -> byte.class;
+            case "short" -> short.class;
+            case "int" -> int.class;
+            case "long" -> long.class;
+            case "float" -> float.class;
+            case "double" -> double.class;
+            case "char" -> char.class;
+            case "boolean[]" -> boolean[].class;
+            case "byte[]" -> byte[].class;
+            case "short[]" -> short[].class;
+            case "int[]" -> int[].class;
+            case "long[]" -> long[].class;
+            case "float[]" -> float[].class;
+            case "double[]" -> double[].class;
+            case "char[]" -> char[].class;
+            default -> getClass(className);
+        };
+    }
+
     public static Class<?> getClass(String className) {
         try {
             return Class.forName(className);
