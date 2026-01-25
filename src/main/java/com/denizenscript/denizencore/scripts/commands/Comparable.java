@@ -141,7 +141,8 @@ public class Comparable {
             case OR_LESS:
             case MORE:
             case LESS:
-                return compareDecimal(objA, objB, operator, context);
+                outcome = compareDecimal(objA, objB, operator, context);
+                break;
             case CONTAINS:
                 outcome = listContains(objA, objB, context);
                 break;
