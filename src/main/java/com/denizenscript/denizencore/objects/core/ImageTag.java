@@ -279,7 +279,7 @@ public class ImageTag implements Adjustable {
         });
     }
 
-    public static final ObjectTagProcessor<ImageTag> tagProcessor = new ObjectTagProcessor<>();
+    public static ObjectTagProcessor<ImageTag> tagProcessor = new ObjectTagProcessor<>();
 
     @Override
     public ObjectTag getObjectAttribute(Attribute attribute) {
